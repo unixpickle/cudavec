@@ -64,44 +64,58 @@ func (v *vector32) ScaleChunks(other anyvec.Vector) {
 	})
 }
 
-// func (v *vector32) AddChunks(other anyvec.Vector) {
-// 	v1 := other.(*vector32)
-// 	if v == v1 {
-// 		panic("inputs overlap")
-// 	} else if v.Len()%v1.Len() != 0 {
-// 		panic("scaler count must divide vector size")
-// 	}
-// 	// TODO: this.
-// 	panic("nyi")
-// }
-//
+func (v *vector32) AddChunks(other anyvec.Vector) {
+	v1 := other.(*vector32)
+	if v == v1 {
+		panic("inputs overlap")
+	} else if v.Len()%v1.Len() != 0 {
+		panic("scaler count must divide vector size")
+	}
+	v.run(func() error {
+		if err := lazyInitAll(true, v, v1); err != nil {
+			return err
+		}
+		grid, block := v.kernelSizes()
+		return v.creator.Handle.kernels32.Launch("addChunks", grid, 1, 1, block, 1, 1,
+			0, v.buffer, v1.buffer, v.Len(), v.Len()/v1.Len())
+	})
+}
+
 // func (v *vector32) Rand(p anyvec.ProbDist, r *rand.Rand) {
 // 	// TODO: don't forget normal alignment.
 // 	panic("nyi")
 // }
-//
-// func (v *vector32) AddRepeated(other anyvec.Vector) {
-// 	v1 := other.(*vector32)
-// 	if v == v1 {
-// 		panic("inputs overlap")
-// 	} else if v1.Len() == 0 {
-// 		panic("repeated vector cannot be empty")
-// 	}
-// 	// TODO: this.
-// 	panic("nyi")
-// }
-//
-// func (v *vector32) ScaleRepeated(other anyvec.Vector) {
-// 	v1 := other.(*vector32)
-// 	if v == v1 {
-// 		panic("inputs overlap")
-// 	} else if v1.Len() == 0 {
-// 		panic("repeated vector cannot be empty")
-// 	}
-// 	// TODO: this.
-// 	panic("nyi")
-// }
-//
+
+func (v *vector32) AddRepeated(other anyvec.Vector) {
+	v.repeatedOp("addRepeated", other.(*vector32))
+}
+
+func (v *vector32) ScaleRepeated(other anyvec.Vector) {
+	v.repeatedOp("scaleRepeated", other.(*vector32))
+}
+
+func (v *vector32) repeatedOp(kernel string, v1 *vector32) {
+	if v == v1 {
+		panic("inputs overlap")
+	} else if v1.Len() == 0 {
+		panic("repeated vector cannot be empty")
+	}
+	v.run(func() error {
+		if err := lazyInitAll(true, v, v1); err != nil {
+			return err
+		}
+		grid, block := v.kernelSizes()
+		if isPowerOf2(v1.Len()) {
+			kernel += "Pow2"
+			return v.creator.Handle.kernels32.Launch(kernel, grid, 1, 1, block, 1, 1,
+				0, v.buffer, v1.buffer, v.Len(), v1.Len()-1)
+		} else {
+			return v.creator.Handle.kernels32.Launch(kernel, grid, 1, 1, block, 1, 1,
+				0, v.buffer, v1.buffer, v.Len(), v1.Len())
+		}
+	})
+}
+
 // func (v *vector32) AbsSum() anyvec.Numeric {
 // 	// TODO: this.
 // 	panic("nyi")
@@ -195,3 +209,13 @@ func (v *vector32) compare(kernel string, alpha float32) {
 // 	panic("nyi")
 // }
 //
+
+func isPowerOf2(n int) bool {
+	log := uint(0)
+	newNum := n
+	for newNum > 1 {
+		newNum >>= 1
+		log++
+	}
+	return newNum<<log == n
+}
