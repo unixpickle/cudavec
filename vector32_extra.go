@@ -116,22 +116,30 @@ func (v *vector32) ScaleChunks(other anyvec.Vector) {
 // 	// TODO: this.
 // 	panic("nyi")
 // }
-//
-// func (v *vector32) LessThan(n anyvec.Numeric) {
-// 	// TODO: this.
-// 	panic("nyi")
-// }
-//
-// func (v *vector32) GreaterThan(n anyvec.Numeric) {
-// 	// TODO: this.
-// 	panic("nyi")
-// }
-//
-// func (v *vector32) EqualTo(n anyvec.Numeric) {
-// 	// TODO: this.
-// 	panic("nyi")
-// }
-//
+
+func (v *vector32) LessThan(n anyvec.Numeric) {
+	v.compare("lessThan", n.(float32))
+}
+
+func (v *vector32) GreaterThan(n anyvec.Numeric) {
+	v.compare("greaterThan", n.(float32))
+}
+
+func (v *vector32) EqualTo(n anyvec.Numeric) {
+	v.compare("equalTo", n.(float32))
+}
+
+func (v *vector32) compare(kernel string, alpha float32) {
+	v.run(func() error {
+		if err := v.lazyInit(true); err != nil {
+			return err
+		}
+		grid, block := v.kernelSizes()
+		return v.creator.Handle.kernels32.Launch(kernel, grid, 1, 1, block, 1, 1,
+			0, alpha, v.buffer, v.Len())
+	})
+}
+
 // func (v *vector32) AddLogs(chunkSize int) anyvec.Vector {
 // 	if chunkSize < 0 {
 // 		panic("chunk size cannot be negative")
