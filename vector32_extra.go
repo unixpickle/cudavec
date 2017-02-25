@@ -305,12 +305,18 @@ func (v *vector32) addLogsKernel(rows, cols int, dst, src cuda.Buffer, threads i
 		uint(threads), 1, 1, sharedSize, dst, src, uint(cols))
 }
 
-// func (v *vector32) ElemMax(other anyvec.Vector) {
-// 	v1 := other.(*vector32)
-// 	v.assertCompat(v1, false)
-// 	// TODO: this.
-// 	panic("nyi")
-// }
+func (v *vector32) ElemMax(other anyvec.Vector) {
+	v1 := other.(*vector32)
+	v.assertCompat(v1, false)
+	v.run(func() error {
+		if err := lazyInitAll(true, v, v1); err != nil {
+			return err
+		}
+		grid, block := v.kernelSizes()
+		return v.creator.Handle.kernels32.Launch("elemMax", grid, 1, 1, block, 1, 1,
+			0, v.buffer, v1.buffer, v.Len())
+	})
+}
 
 func (v *vector32) LogSoftmax(chunkSize int) {
 	if chunkSize < 0 {
@@ -341,25 +347,48 @@ func (v *vector32) LogSoftmax(chunkSize int) {
 	})
 }
 
-//
-// func (v *vector32) Pow(n anyvec.Numeric) {
-// 	// TODO: this.
-// 	panic("nyi")
-// }
-//
-// func (v *vector32) MapMax(cols int) anyvec.Mapper {
-// 	if cols < 0 {
-// 		panic("column count cannot be negative")
-// 	} else if v.Len()%cols != 0 {
-// 		panic("column count must divide vector size")
-// 	}
-// 	if v.Len() == 0 || cols == 0 {
-// 		return newMapper32(v.creator, 0, []int{})
-// 	}
-// 	// TODO: this.
-// 	panic("nyi")
-// }
-//
+func (v *vector32) Pow(n anyvec.Numeric) {
+	scaler := n.(float32)
+	v.run(func() error {
+		if scaler > 0 && v.buffer == nil {
+			return nil
+		}
+		if err := v.lazyInit(true); err != nil {
+			return err
+		}
+		grid, block := v.kernelSizes()
+		return v.creator.Handle.kernels32.Launch("powScaler", grid, 1, 1,
+			block, 1, 1, 0, scaler, v.buffer, v.Len())
+	})
+}
+
+func (v *vector32) MapMax(cols int) anyvec.Mapper {
+	if cols < 0 {
+		panic("column count cannot be negative")
+	} else if v.Len()%cols != 0 {
+		panic("column count must divide vector size")
+	}
+	if v.Len() == 0 {
+		return newMapper32(v.creator, 0, []int{})
+	}
+	rows := v.Len() / cols
+	res := &mapper32{creator: v.creator, inSize: v.Len(), outSize: rows}
+	v.run(func() error {
+		if err := v.lazyInit(true); err != nil {
+			return err
+		}
+		buf, err := cuda.AllocBuffer(v.creator.Handle.allocator, uintptr(rows)*4)
+		if err != nil {
+			return err
+		}
+		res.table = buf
+		dummyVec := &vector32{size: rows}
+		grid, block := dummyVec.kernelSizes()
+		return v.creator.Handle.kernels32.Launch("mapMax", grid, 1, 1, block, 1, 1,
+			0, buf, v.buffer, rows, cols)
+	})
+	return res
+}
 
 func isPowerOf2(n int) bool {
 	log := uint(0)
