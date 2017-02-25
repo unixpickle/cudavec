@@ -19,15 +19,16 @@ type Handle struct {
 	context   *cuda.Context
 	allocator cuda.Allocator
 
-	gen     *curand.Generator
-	blas    *cublas.Handle
-	kernels *cuda.Module
+	gen  *curand.Generator
+	blas *cublas.Handle
+
+	kernels32 *cuda.Module
 }
 
 // NewHandleDefault creates a handle with the default CUDA
 // device and allocator.
-func NewHandle() (*Handle, error) {
-	return NewHandleCustom(nil, nil)
+func NewHandleDefault() (*Handle, error) {
+	return NewHandle(nil, nil)
 }
 
 // NewHandle creates a Handle using the specified context
@@ -36,7 +37,7 @@ func NewHandle() (*Handle, error) {
 // If the context is nil, a new one is created.
 //
 // If the allocator is nil, a new one is created.
-func NewHandleCustom(ctx *cuda.Context, all cuda.Allocator) (h *Handle, err error) {
+func NewHandle(ctx *cuda.Context, all cuda.Allocator) (h *Handle, err error) {
 	defer essentials.AddCtxTo("create Handle", &err)
 	if ctx == nil {
 		devs, err := cuda.AllDevices()
@@ -68,7 +69,10 @@ func NewHandleCustom(ctx *cuda.Context, all cuda.Allocator) (h *Handle, err erro
 			return err
 		}
 
-		// TODO: load kernels here.
+		h.kernels32, err = cuda.NewModule(ctx, kernels32PTX)
+		if err != nil {
+			return err
+		}
 
 		if h.allocator != nil {
 			h.allocator, err = cuda.BFCAllocator(ctx, 0)
