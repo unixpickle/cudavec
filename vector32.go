@@ -177,7 +177,7 @@ func (v *vector32) Mul(other anyvec.Vector) {
 			return err
 		}
 		return v.creator.Handle.blas.Sdgmm(cublas.Left, v.Len(), 1,
-			v.buffer, 1, v1.buffer, 1, v.buffer, 1)
+			v.buffer, v.Len(), v1.buffer, 1, v.buffer, v.Len())
 	})
 }
 
@@ -189,7 +189,7 @@ func (v *vector32) Div(other anyvec.Vector) {
 			return err
 		}
 		grid, block := v.kernelSizes()
-		return v.creator.Handle.kernels32.Launch("kernel", grid, 1, 1,
+		return v.creator.Handle.kernels32.Launch("divElements", grid, 1, 1,
 			block, 1, 1, 0, v.buffer, v1.buffer, v.Len())
 	})
 }
@@ -216,8 +216,8 @@ func (v *vector32) Gemm(transA, transB bool, m, n, k int,
 		if transB {
 			tb = cublas.Trans
 		}
-		return v.creator.Handle.blas.Sgemm(ta, tb, m, n, k,
-			alphaFloat, a32.buffer, lda, b32.buffer, ldb,
+		return v.creator.Handle.blas.Sgemm(tb, ta, n, m, k,
+			alphaFloat, b32.buffer, ldb, a32.buffer, lda,
 			betaFloat, v.buffer, ldc)
 	})
 }
@@ -268,7 +268,7 @@ func (v *vector32) lazyInit(clear bool) error {
 }
 
 func (v *vector32) assertCompat(v1 *vector32, readOnly bool) {
-	if readOnly || v == v1 {
+	if !readOnly && v == v1 {
 		panic("vectors cannot be equal")
 	} else if v.Len() != v1.Len() {
 		panic("length mismatch")

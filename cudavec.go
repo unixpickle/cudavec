@@ -74,7 +74,7 @@ func NewHandle(ctx *cuda.Context, all cuda.Allocator) (h *Handle, err error) {
 			return err
 		}
 
-		if h.allocator != nil {
+		if h.allocator == nil {
 			h.allocator, err = cuda.BFCAllocator(ctx, 0)
 			if err != nil {
 				return err
