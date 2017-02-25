@@ -25,7 +25,7 @@ func newMapper32(c *Creator32, inSize int, table []int) *mapper32 {
 	}
 	res := &mapper32{creator: c, inSize: inSize, outSize: len(table)}
 	c.run(func() error {
-		buf, err := cuda.AllocBuffer(c.Handle.allocator, uintptr(inSize)*4)
+		buf, err := cuda.AllocBuffer(c.Handle.allocator, uintptr(len(table))*4)
 		if err != nil {
 			return err
 		}

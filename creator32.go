@@ -68,7 +68,7 @@ func (c *Creator32) Concat(v ...anyvec.Vector) anyvec.Vector {
 		}
 		var off uintptr
 		for _, x := range v {
-			subSlice := cuda.Slice(buf, off, off+uintptr(x.Len()))
+			subSlice := cuda.Slice(buf, off, off+uintptr(x.Len())*4)
 			rawX := x.(*vector32)
 			if rawX.buffer != nil {
 				if err := cuda.CopyBuffer(subSlice, rawX.buffer); err != nil {

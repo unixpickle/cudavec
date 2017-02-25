@@ -172,6 +172,9 @@ func (v *vector32) Sub(other anyvec.Vector) {
 func (v *vector32) Mul(other anyvec.Vector) {
 	v1 := other.(*vector32)
 	v.assertCompat(v1, false)
+	if v.Len() == 0 {
+		return
+	}
 	v.run(func() error {
 		if err := lazyInitAll(true, v, v1); err != nil {
 			return err
