@@ -1,6 +1,8 @@
 package cudavec
 
 import (
+	"math/rand"
+
 	"github.com/unixpickle/anyvec"
 	"github.com/unixpickle/cuda"
 	"github.com/unixpickle/cuda/cublas"
@@ -82,10 +84,65 @@ func (v *vector32) AddChunks(other anyvec.Vector) {
 	})
 }
 
-// func (v *vector32) Rand(p anyvec.ProbDist, r *rand.Rand) {
-// 	// TODO: don't forget normal alignment.
-// 	panic("nyi")
-// }
+func (v *vector32) Rand(p anyvec.ProbDist, r *rand.Rand) {
+	switch p {
+	case anyvec.Uniform:
+		v.randUniform()
+	case anyvec.Bernoulli:
+		v.randBernoulli()
+	case anyvec.Normal:
+		v.randNormal()
+	default:
+		panic("unsupported distribution")
+	}
+}
+
+func (v *vector32) randUniform() {
+	v.run(func() error {
+		if err := v.lazyInit(false); err != nil {
+			return err
+		}
+		if err := v.creator.Handle.gen.Uniform(v.buffer); err != nil {
+			return err
+		}
+		grid, block := v.kernelSizes()
+		return v.creator.Handle.kernels32.Launch("shiftRandUniform", grid, 1, 1,
+			block, 1, 1, 0, v.buffer, v.Len())
+	})
+}
+
+func (v *vector32) randBernoulli() {
+	v.run(func() error {
+		if err := v.lazyInit(false); err != nil {
+			return err
+		}
+		if err := v.creator.Handle.gen.Uniform(v.buffer); err != nil {
+			return err
+		}
+		grid, block := v.kernelSizes()
+		return v.creator.Handle.kernels32.Launch("uniformToBernoulli", grid, 1, 1,
+			block, 1, 1, 0, v.buffer, v.Len())
+	})
+}
+
+func (v *vector32) randNormal() {
+	v.run(func() error {
+		if err := v.lazyInit(false); err != nil {
+			return err
+		}
+		if v.Len()%2 == 0 {
+			return v.creator.Handle.gen.Normal(v.buffer, 0, 1)
+		}
+		tempBuf, err := cuda.AllocBuffer(v.creator.Handle.allocator, v.buffer.Size()+4)
+		if err != nil {
+			return err
+		}
+		if err := v.creator.Handle.gen.Normal(tempBuf, 0, 1); err != nil {
+			return err
+		}
+		return cuda.CopyBuffer(v.buffer, tempBuf)
+	})
+}
 
 func (v *vector32) AddRepeated(other anyvec.Vector) {
 	v.repeatedOp("addRepeated", other.(*vector32))
