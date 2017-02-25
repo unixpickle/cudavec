@@ -2,6 +2,7 @@ package cudavec
 
 import (
 	"github.com/unixpickle/anyvec"
+	"github.com/unixpickle/cuda"
 	"github.com/unixpickle/cuda/cublas"
 )
 
@@ -116,20 +117,49 @@ func (v *vector32) repeatedOp(kernel string, v1 *vector32) {
 	})
 }
 
-// func (v *vector32) AbsSum() anyvec.Numeric {
-// 	// TODO: this.
-// 	panic("nyi")
-// }
-//
-// func (v *vector32) AbsMax() anyvec.Numeric {
-// 	// TODO: this.
-// 	panic("nyi")
-// }
-//
-// func (v *vector32) Norm() anyvec.Numeric {
-// 	// TODO: this.
-// 	panic("nyi")
-// }
+func (v *vector32) AbsSum() anyvec.Numeric {
+	return v.norm(v.creator.Handle.blas.Sasum)
+}
+
+func (v *vector32) AbsMax() anyvec.Numeric {
+	var res float32
+	v.runSync(func() error {
+		if v.buffer == nil || v.Len() == 0 {
+			return nil
+		}
+		var idx int
+		err := v.creator.Handle.blas.Isamax(v.Len(), v.buffer, 1, &idx)
+		if err != nil {
+			return err
+		}
+
+		outSlice := make([]float32, 1)
+		inSlice := cuda.Slice(v.buffer, uintptr(idx-1)*4, uintptr(idx)*4)
+
+		err = cuda.ReadBuffer(outSlice, inSlice)
+		res = outSlice[0]
+		return err
+	})
+	if res < 0 {
+		res = -res
+	}
+	return res
+}
+
+func (v *vector32) Norm() anyvec.Numeric {
+	return v.norm(v.creator.Handle.blas.Snrm2)
+}
+
+func (v *vector32) norm(f func(int, cuda.Buffer, int, interface{}) error) anyvec.Numeric {
+	var res float32
+	v.runSync(func() error {
+		if v.buffer == nil {
+			return nil
+		}
+		return f(v.Len(), v.buffer, 1, &res)
+	})
+	return res
+}
 
 func (v *vector32) LessThan(n anyvec.Numeric) {
 	v.compare("lessThan", n.(float32))
