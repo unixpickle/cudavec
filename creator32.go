@@ -90,7 +90,10 @@ func (c *Creator32) Concat(v ...anyvec.Vector) anyvec.Vector {
 
 // MakeMapper creates a mapper.
 func (c *Creator32) MakeMapper(inSize int, table []int) anyvec.Mapper {
-	panic("nyi")
+	if inSize < 0 {
+		panic("input size out of range")
+	}
+	return newMapper32(c, inSize, table)
 }
 
 func (c *Creator32) run(f func() error) <-chan error {
