@@ -137,7 +137,15 @@ func (v *vector32) Scale(s anyvec.Numeric) {
 }
 
 func (v *vector32) AddScaler(s anyvec.Numeric) {
-	panic("nyi")
+	scaler := s.(float32)
+	v.run(func() error {
+		if err := v.lazyInit(true); err != nil {
+			return err
+		}
+		grid, block := v.kernelSizes()
+		return v.creator.Handle.kernels32.Launch("addScaler", grid, 1, 1,
+			block, 1, 1, 0, scaler, v.buffer, v.Len())
+	})
 }
 
 func (v *vector32) Dot(other anyvec.Vector) anyvec.Numeric {
@@ -164,7 +172,13 @@ func (v *vector32) Sub(other anyvec.Vector) {
 func (v *vector32) Mul(other anyvec.Vector) {
 	v1 := other.(*vector32)
 	v.assertCompat(v1, false)
-	panic("nyi")
+	v.run(func() error {
+		if err := lazyInitAll(true, v, v1); err != nil {
+			return err
+		}
+		return v.creator.Handle.blas.Sdgmm(cublas.Left, v.Len(), 1,
+			v.buffer, 1, v1.buffer, 1, v.buffer, 1)
+	})
 }
 
 func (v *vector32) Div(other anyvec.Vector) {
