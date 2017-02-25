@@ -92,9 +92,7 @@ func (v *vector32) Slice(start, end int) anyvec.Vector {
 
 func (v *vector32) SetSlice(start int, other anyvec.Vector) {
 	v1 := other.(*vector32)
-	if v1.Len() > v.Len()-start {
-		panic("index out of range")
-	} else if start <= -v1.Len() {
+	if start <= -v1.Len() || start >= v.Len() {
 		return
 	}
 
