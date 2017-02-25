@@ -144,8 +144,8 @@ func (v *vector32) Dot(v1 anyvec.Vector) anyvec.Numeric {
 	var res float32
 	v.runSync(func() error {
 		v32 := v1.(*vector32)
-		if v32.buffer == nil || v.buffer == nil {
-			return nil
+		if err := lazyInitAll(true, v, v32); err != nil {
+			return err
 		}
 		return v.creator.Handle.blas.Sdot(v.Len(), v.buffer, 1, v32.buffer, 1, &res)
 	})
@@ -167,7 +167,15 @@ func (v *vector32) Mul(v1 anyvec.Vector) {
 
 func (v *vector32) Div(v1 anyvec.Vector) {
 	v.assertCompat(v1, false)
-	panic("nyi")
+	v132 := v1.(*vector32)
+	v.run(func() error {
+		if err := lazyInitAll(true, v, v132); err != nil {
+			return err
+		}
+		grid, block := v.kernelSizes()
+		return v.creator.Handle.kernels32.Launch("kernel", grid, 1, 1,
+			block, 1, 1, 0, v.buffer, v132.buffer, v.Len())
+	})
 }
 
 func (v *vector32) Gemm(transA, transB bool, m, n, k int,
@@ -177,10 +185,13 @@ func (v *vector32) Gemm(transA, transB bool, m, n, k int,
 	betaFloat := beta.(float32)
 	a32 := a.(*vector32)
 	b32 := b.(*vector32)
+	if a32 == b32 || a32 == v || b32 == v {
+		panic("vectors cannot be equal")
+	}
 	v.run(func() error {
-		v.lazyInit(true)
-		a32.lazyInit(true)
-		b32.lazyInit(true)
+		if err := lazyInitAll(true, v, a32, b32); err != nil {
+			return err
+		}
 		ta := cublas.NoTrans
 		tb := cublas.NoTrans
 		if transA {
@@ -197,8 +208,8 @@ func (v *vector32) Gemm(transA, transB bool, m, n, k int,
 
 func (v *vector32) axpy(scaler float32, v1 anyvec.Vector) {
 	v.assertCompat(v1, false)
+	v32 := v1.(*vector32)
 	v.run(func() error {
-		v32 := v1.(*vector32)
 		if v32.buffer == nil {
 			return nil
 		} else if v.buffer == nil {
@@ -248,4 +259,27 @@ func (v *vector32) assertCompat(v1 anyvec.Vector, readOnly bool) {
 	} else if v.Len() != v132.Len() {
 		panic("length mismatch")
 	}
+}
+
+func (v *vector32) kernelSizes() (grid, block uint) {
+	block = 128
+	if uint(v.Len()) < block {
+		block = uint(v.Len())
+		grid = 1
+	} else {
+		grid = uint(v.Len()) / block
+		if uint(v.Len())%block != 0 {
+			grid++
+		}
+	}
+	return
+}
+
+func lazyInitAll(clear bool, vs ...*vector32) error {
+	for _, x := range vs {
+		if err := x.lazyInit(clear); err != nil {
+			return err
+		}
+	}
+	return nil
 }
