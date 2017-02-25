@@ -79,6 +79,7 @@ func NewHandle(ctx *cuda.Context, all cuda.Allocator) (h *Handle, err error) {
 			if err != nil {
 				return err
 			}
+			h.allocator = cuda.GCAllocator(h.allocator, 0)
 		}
 		return nil
 	})
