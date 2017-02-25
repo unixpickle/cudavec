@@ -241,42 +241,106 @@ func (v *vector32) compare(kernel string, alpha float32) {
 	})
 }
 
-// func (v *vector32) AddLogs(chunkSize int) anyvec.Vector {
-// 	if chunkSize < 0 {
-// 		panic("chunk size cannot be negative")
-// 	} else if chunkSize == 0 {
-// 		chunkSize = v.Len()
-// 	} else if v.Len()%chunkSize != 0 {
-// 		panic("chunk size must divide vector size")
-// 	}
-// 	if v.Len() == 0 {
-// 		return v.creator.MakeVector(0)
-// 	}
-// 	// TODO: this.
-// 	panic("nyi")
-// }
-//
+func (v *vector32) AddLogs(chunkSize int) anyvec.Vector {
+	if chunkSize < 0 {
+		panic("chunk size cannot be negative")
+	} else if chunkSize == 0 {
+		chunkSize = v.Len()
+	} else if v.Len()%chunkSize != 0 {
+		panic("chunk size must divide vector size")
+	}
+	if v.Len() == 0 {
+		return v.creator.MakeVector(0)
+	}
+
+	res := v.creator.MakeVector(v.Len() / chunkSize).(*vector32)
+
+	v.run(func() error {
+		if err := lazyInitAll(true, v, res); err != nil {
+			return err
+		}
+		err := v.addLogs(v.Len()/chunkSize, chunkSize, res.buffer, v.buffer)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return res
+}
+
+func (v *vector32) addLogs(rows, cols int, dst, src cuda.Buffer) error {
+	threads := 256
+	for threads/2 >= cols && threads > 32 {
+		threads /= 2
+	}
+
+	for cols > threads {
+		dstCols := cols / threads
+		if cols%threads != 0 {
+			dstCols++
+		}
+		dstSize := uintptr(dstCols) * uintptr(rows) * 4
+		tmp, err := cuda.AllocBuffer(v.creator.Handle.allocator, dstSize)
+		if err != nil {
+			return err
+		}
+		if err := v.addLogsKernel(rows, cols, tmp, src, threads); err != nil {
+			return err
+		}
+		src = tmp
+		cols = dstCols
+	}
+
+	return v.addLogsKernel(rows, cols, dst, src, threads)
+}
+
+func (v *vector32) addLogsKernel(rows, cols int, dst, src cuda.Buffer, threads int) error {
+	grid := uint(cols / threads)
+	if cols%threads != 0 {
+		grid++
+	}
+	sharedSize := 4 * uint(threads)
+	return v.creator.Handle.kernels32.Launch("addLogs", uint(rows), grid, 1,
+		uint(threads), 1, 1, sharedSize, dst, src, uint(cols))
+}
+
 // func (v *vector32) ElemMax(other anyvec.Vector) {
 // 	v1 := other.(*vector32)
 // 	v.assertCompat(v1, false)
 // 	// TODO: this.
 // 	panic("nyi")
 // }
-//
-// func (v *vector32) LogSoftmax(chunkSize int) {
-// 	if chunkSize < 0 {
-// 		panic("chunk size cannot be negative")
-// 	} else if chunkSize == 0 {
-// 		chunkSize = v.Len()
-// 	} else if v.Len()%chunkSize != 0 {
-// 		panic("chunk size must divide vector size")
-// 	}
-// 	if v.Len() == 0 {
-// 		return
-// 	}
-// 	// TODO: this.
-// 	panic("nyi")
-// }
+
+func (v *vector32) LogSoftmax(chunkSize int) {
+	if chunkSize < 0 {
+		panic("chunk size cannot be negative")
+	} else if chunkSize == 0 {
+		chunkSize = v.Len()
+	} else if v.Len()%chunkSize != 0 {
+		panic("chunk size must divide vector size")
+	}
+	if v.Len() == 0 {
+		return
+	}
+	v.run(func() error {
+		if err := v.lazyInit(true); err != nil {
+			return err
+		}
+		size := uintptr(v.Len()/chunkSize) * 4
+		tmp, err := cuda.AllocBuffer(v.creator.Handle.allocator, size)
+		if err != nil {
+			return err
+		}
+		if err := v.addLogs(v.Len()/chunkSize, chunkSize, tmp, v.buffer); err != nil {
+			return err
+		}
+		grid, block := v.kernelSizes()
+		return v.creator.Handle.kernels32.Launch("subChunks", grid, 1, 1,
+			block, 1, 1, 0, v.buffer, tmp, v.Len(), chunkSize)
+	})
+}
+
 //
 // func (v *vector32) Pow(n anyvec.Numeric) {
 // 	// TODO: this.
