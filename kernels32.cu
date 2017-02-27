@@ -125,6 +125,14 @@ void addScaler(float s, float * dest, int destLen) {
 }
 
 extern "C" __global__
+void setScaler(float s, float * dest, int destLen) {
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	if (tid < destLen) {
+		dest[tid] = s;
+	}
+}
+
+extern "C" __global__
 void addChunks(float * dest, float * source, int destLen, int chunkSize) {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
 	if (tid < destLen) {

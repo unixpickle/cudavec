@@ -390,6 +390,43 @@ func (v *vector32) MapMax(cols int) anyvec.Mapper {
 	return res
 }
 
+func (v *vector32) SumRows(cols int) anyvec.Vector {
+	if cols < 0 {
+		panic("column count cannot be negative")
+	} else if v.Len()%cols != 0 {
+		panic("column count must divide vector size")
+	}
+	if v.Len() == 0 {
+		return v.Creator().MakeVector(cols)
+	}
+	rows := v.Len() / cols
+	res := &vector32{creator: v.creator, size: cols}
+	v.run(func() error {
+		if err := lazyInitAll(true, v, res); err != nil {
+			return err
+		}
+		ones, err := cuda.AllocBuffer(v.creator.Handle.allocator, uintptr(rows)*4)
+		if err != nil {
+			return err
+		}
+		dummy := vector32{size: rows}
+		grid, block := dummy.kernelSizes()
+		err = v.creator.Handle.kernels32.Launch("setScaler", grid, 1, 1,
+			block, 1, 1, 0, float32(1), ones, rows)
+		if err != nil {
+			return err
+		}
+		return v.creator.Handle.blas.Sgemm(cublas.NoTrans, cublas.NoTrans,
+			cols, 1, rows,
+			float32(1),
+			v.buffer, cols,
+			ones, rows,
+			float32(0),
+			res.buffer, cols)
+	})
+	return res
+}
+
 func isPowerOf2(n int) bool {
 	log := uint(0)
 	newNum := n
