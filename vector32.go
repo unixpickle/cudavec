@@ -202,7 +202,7 @@ func (v *vector32) Gemm(transA, transB bool, m, n, k int,
 	betaFloat := beta.(float32)
 	a32 := a.(*vector32)
 	b32 := b.(*vector32)
-	if a32 == b32 || a32 == v || b32 == v {
+	if a32 == v || b32 == v {
 		panic("vectors cannot be equal")
 	}
 	v.run(func() error {
