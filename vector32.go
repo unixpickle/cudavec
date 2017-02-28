@@ -223,6 +223,29 @@ func (v *vector32) Gemm(transA, transB bool, m, n, k int,
 	})
 }
 
+func (v *vector32) Gemv(trans bool, m, n int, alpha anyvec.Numeric, a anyvec.Vector, lda int,
+	x anyvec.Vector, incx int, beta anyvec.Numeric, incy int) {
+	alphaFloat := alpha.(float32)
+	betaFloat := beta.(float32)
+	x32 := x.(*vector32)
+	a32 := a.(*vector32)
+	if x32 == v || a32 == v {
+		panic("vectors cannot be equal")
+	}
+	v.run(func() error {
+		if err := lazyInitAll(true, v, x32, a32); err != nil {
+			return err
+		}
+		tA := cublas.Trans
+		if trans {
+			tA = cublas.NoTrans
+		}
+		return v.creator.Handle.blas.Sgemv(tA, n, m, alphaFloat,
+			a32.buffer, lda, x32.buffer, incx,
+			betaFloat, v.buffer, incy)
+	})
+}
+
 func (v *vector32) axpy(scaler float32, v1 *vector32) {
 	v.assertCompat(v1, false)
 	v.run(func() error {
