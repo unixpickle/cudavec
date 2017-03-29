@@ -427,6 +427,68 @@ func (v *vector32) SumRows(cols int) anyvec.Vector {
 	return res
 }
 
+func (v *vector32) BatchedGemm(transA, transB bool, num, m, n, k int, alpha anyvec.Numeric,
+	a, b anyvec.Vector, beta anyvec.Numeric) {
+	a32 := a.(*vector32)
+	b32 := b.(*vector32)
+	alpha32 := alpha.(float32)
+	beta32 := beta.(float32)
+	if a32 == v || b32 == v {
+		panic("vectors cannot be equal")
+	}
+	v.creator.run(func() error {
+		if err := lazyInitAll(true, a32, b32, v); err != nil {
+			return err
+		}
+		aBatch := a32.splitBatch(num)
+		bBatch := b32.splitBatch(num)
+		cBatch := v.splitBatch(num)
+
+		for i, subC := range cBatch {
+			lda, ldb := k, n
+			if transA {
+				lda = m
+			}
+			if transB {
+				ldb = k
+			}
+
+			tA, tB := cublas.NoTrans, cublas.NoTrans
+			if transA {
+				tA = cublas.Trans
+			}
+			if transB {
+				tB = cublas.Trans
+			}
+
+			err := v.creator.Handle.blas.Sgemm(tB, tA,
+				n, m, k,
+				alpha32,
+				bBatch[i], ldb,
+				aBatch[i], lda,
+				beta32,
+				subC, n)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (v *vector32) splitBatch(batchSize int) []cuda.Buffer {
+	if v.Len()%batchSize != 0 {
+		panic("batch size must divide vector length")
+	}
+	chunkSize := v.buffer.Size() / uintptr(batchSize)
+	var res []cuda.Buffer
+	for i := 0; i < batchSize; i++ {
+		res = append(res, cuda.Slice(v.buffer, uintptr(i)*chunkSize,
+			uintptr(i+1)*chunkSize))
+	}
+	return res
+}
+
 func isPowerOf2(n int) bool {
 	log := uint(0)
 	newNum := n
