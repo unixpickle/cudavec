@@ -445,6 +445,15 @@ func (v *vector32) BatchedGemm(transA, transB bool, num, m, n, k int, alpha anyv
 		cBatch := v.splitBatch(num)
 
 		for i, subC := range cBatch {
+			stream, err := cuda.NewStream(false)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				stream.Synchronize()
+				stream.Close()
+			}()
+
 			lda, ldb := k, n
 			if transA {
 				lda = m
@@ -461,13 +470,17 @@ func (v *vector32) BatchedGemm(transA, transB bool, num, m, n, k int, alpha anyv
 				tB = cublas.Trans
 			}
 
-			err := v.creator.Handle.blas.Sgemm(tB, tA,
+			if err := v.creator.Handle.blas.SetStream(stream); err != nil {
+				return err
+			}
+			err = v.creator.Handle.blas.Sgemm(tB, tA,
 				n, m, k,
 				alpha32,
 				bBatch[i], ldb,
 				aBatch[i], lda,
 				beta32,
 				subC, n)
+			v.creator.Handle.blas.SetStream(nil)
 			if err != nil {
 				return err
 			}
