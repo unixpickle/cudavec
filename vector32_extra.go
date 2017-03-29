@@ -39,7 +39,7 @@ func (v *vector32) unaryOp(kernel string) {
 		}
 		grid, block := v.kernelSizes()
 		return v.creator.Handle.kernels32.Launch(kernel, grid, 1, 1, block, 1, 1,
-			0, v.buffer, v.Len())
+			0, nil, v.buffer, v.Len())
 	})
 }
 
@@ -80,7 +80,7 @@ func (v *vector32) AddChunks(other anyvec.Vector) {
 		}
 		grid, block := v.kernelSizes()
 		return v.creator.Handle.kernels32.Launch("addChunks", grid, 1, 1, block, 1, 1,
-			0, v.buffer, v1.buffer, v.Len(), v.Len()/v1.Len())
+			0, nil, v.buffer, v1.buffer, v.Len(), v.Len()/v1.Len())
 	})
 }
 
@@ -107,7 +107,7 @@ func (v *vector32) randUniform() {
 		}
 		grid, block := v.kernelSizes()
 		return v.creator.Handle.kernels32.Launch("shiftRandUniform", grid, 1, 1,
-			block, 1, 1, 0, v.buffer, v.Len())
+			block, 1, 1, 0, nil, v.buffer, v.Len())
 	})
 }
 
@@ -121,7 +121,7 @@ func (v *vector32) randBernoulli() {
 		}
 		grid, block := v.kernelSizes()
 		return v.creator.Handle.kernels32.Launch("uniformToBernoulli", grid, 1, 1,
-			block, 1, 1, 0, v.buffer, v.Len())
+			block, 1, 1, 0, nil, v.buffer, v.Len())
 	})
 }
 
@@ -166,10 +166,10 @@ func (v *vector32) repeatedOp(kernel string, v1 *vector32) {
 		if isPowerOf2(v1.Len()) {
 			kernel += "Pow2"
 			return v.creator.Handle.kernels32.Launch(kernel, grid, 1, 1, block, 1, 1,
-				0, v.buffer, v1.buffer, v.Len(), v1.Len()-1)
+				0, nil, v.buffer, v1.buffer, v.Len(), v1.Len()-1)
 		} else {
 			return v.creator.Handle.kernels32.Launch(kernel, grid, 1, 1, block, 1, 1,
-				0, v.buffer, v1.buffer, v.Len(), v1.Len())
+				0, nil, v.buffer, v1.buffer, v.Len(), v1.Len())
 		}
 	})
 }
@@ -237,7 +237,7 @@ func (v *vector32) compare(kernel string, alpha float32) {
 		}
 		grid, block := v.kernelSizes()
 		return v.creator.Handle.kernels32.Launch(kernel, grid, 1, 1, block, 1, 1,
-			0, alpha, v.buffer, v.Len())
+			0, nil, alpha, v.buffer, v.Len())
 	})
 }
 
@@ -302,7 +302,7 @@ func (v *vector32) addLogsKernel(rows, cols int, dst, src cuda.Buffer, threads i
 	}
 	sharedSize := 4 * uint(threads)
 	return v.creator.Handle.kernels32.Launch("addLogs", uint(rows), grid, 1,
-		uint(threads), 1, 1, sharedSize, dst, src, uint(cols))
+		uint(threads), 1, 1, sharedSize, nil, dst, src, uint(cols))
 }
 
 func (v *vector32) ElemMax(other anyvec.Vector) {
@@ -314,7 +314,7 @@ func (v *vector32) ElemMax(other anyvec.Vector) {
 		}
 		grid, block := v.kernelSizes()
 		return v.creator.Handle.kernels32.Launch("elemMax", grid, 1, 1, block, 1, 1,
-			0, v.buffer, v1.buffer, v.Len())
+			0, nil, v.buffer, v1.buffer, v.Len())
 	})
 }
 
@@ -343,7 +343,7 @@ func (v *vector32) LogSoftmax(chunkSize int) {
 		}
 		grid, block := v.kernelSizes()
 		return v.creator.Handle.kernels32.Launch("subChunks", grid, 1, 1,
-			block, 1, 1, 0, v.buffer, tmp, v.Len(), chunkSize)
+			block, 1, 1, 0, nil, v.buffer, tmp, v.Len(), chunkSize)
 	})
 }
 
@@ -358,7 +358,7 @@ func (v *vector32) Pow(n anyvec.Numeric) {
 		}
 		grid, block := v.kernelSizes()
 		return v.creator.Handle.kernels32.Launch("powScaler", grid, 1, 1,
-			block, 1, 1, 0, scaler, v.buffer, v.Len())
+			block, 1, 1, 0, nil, scaler, v.buffer, v.Len())
 	})
 }
 
@@ -385,7 +385,7 @@ func (v *vector32) MapMax(cols int) anyvec.Mapper {
 		dummyVec := &vector32{size: rows}
 		grid, block := dummyVec.kernelSizes()
 		return v.creator.Handle.kernels32.Launch("mapMax", grid, 1, 1, block, 1, 1,
-			0, buf, v.buffer, rows, cols)
+			0, nil, buf, v.buffer, rows, cols)
 	})
 	return res
 }
@@ -412,7 +412,7 @@ func (v *vector32) SumRows(cols int) anyvec.Vector {
 		dummy := vector32{size: rows}
 		grid, block := dummy.kernelSizes()
 		err = v.creator.Handle.kernels32.Launch("setScaler", grid, 1, 1,
-			block, 1, 1, 0, float32(1), ones, rows)
+			block, 1, 1, 0, nil, float32(1), ones, rows)
 		if err != nil {
 			return err
 		}

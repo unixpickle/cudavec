@@ -142,7 +142,7 @@ func (v *vector32) AddScaler(s anyvec.Numeric) {
 		}
 		grid, block := v.kernelSizes()
 		return v.creator.Handle.kernels32.Launch("addScaler", grid, 1, 1,
-			block, 1, 1, 0, scaler, v.buffer, v.Len())
+			block, 1, 1, 0, nil, scaler, v.buffer, v.Len())
 	})
 }
 
@@ -191,7 +191,7 @@ func (v *vector32) Div(other anyvec.Vector) {
 		}
 		grid, block := v.kernelSizes()
 		return v.creator.Handle.kernels32.Launch("divElements", grid, 1, 1,
-			block, 1, 1, 0, v.buffer, v1.buffer, v.Len())
+			block, 1, 1, 0, nil, v.buffer, v1.buffer, v.Len())
 	})
 }
 

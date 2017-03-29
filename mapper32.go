@@ -69,7 +69,7 @@ func (m *mapper32) Map(in, out anyvec.Vector) {
 		}
 		grid, block := out32.kernelSizes()
 		return m.creator.Handle.kernels32.Launch("mapForward", grid, 1, 1, block, 1, 1,
-			0, out32.buffer, in32.buffer, m.table, m.outSize)
+			0, nil, out32.buffer, in32.buffer, m.table, m.outSize)
 	})
 }
 
@@ -89,6 +89,6 @@ func (m *mapper32) MapTranspose(in, out anyvec.Vector) {
 		}
 		grid, block := in32.kernelSizes()
 		return m.creator.Handle.kernels32.Launch("mapBackward", grid, 1, 1, block, 1, 1,
-			0, out32.buffer, in32.buffer, m.table, m.outSize)
+			0, nil, out32.buffer, in32.buffer, m.table, m.outSize)
 	})
 }
