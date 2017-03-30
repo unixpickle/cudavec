@@ -6,6 +6,7 @@ import (
 	"github.com/unixpickle/anyvec"
 	"github.com/unixpickle/cuda"
 	"github.com/unixpickle/cuda/cublas"
+	"github.com/unixpickle/essentials"
 )
 
 func (v *vector32) Exp() {
@@ -444,15 +445,20 @@ func (v *vector32) BatchedGemm(transA, transB bool, num, m, n, k int, alpha anyv
 		bBatch := b32.splitBatch(num)
 		cBatch := v.splitBatch(num)
 
-		for i, subC := range cBatch {
+		desiredStreams := essentials.MinInt(maxCudaStreams, num)
+		for desiredStreams > len(v.creator.Handle.streams) {
 			stream, err := cuda.NewStream(false)
 			if err != nil {
 				return err
 			}
-			defer func() {
-				stream.Synchronize()
-				stream.Close()
-			}()
+			v.creator.Handle.streams = append(v.creator.Handle.streams, stream)
+		}
+
+		for i, subC := range cBatch {
+			stream := v.creator.Handle.streams[i%maxCudaStreams]
+			if i < maxCudaStreams {
+				defer stream.Synchronize()
+			}
 
 			lda, ldb := k, n
 			if transA {
@@ -473,7 +479,7 @@ func (v *vector32) BatchedGemm(transA, transB bool, num, m, n, k int, alpha anyv
 			if err := v.creator.Handle.blas.SetStream(stream); err != nil {
 				return err
 			}
-			err = v.creator.Handle.blas.Sgemm(tB, tA,
+			err := v.creator.Handle.blas.Sgemm(tB, tA,
 				n, m, k,
 				alpha32,
 				bBatch[i], ldb,

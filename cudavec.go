@@ -10,6 +10,8 @@ import (
 	"github.com/unixpickle/essentials"
 )
 
+const maxCudaStreams = 32
+
 // A Handle is the first thing you must obtain in order to
 // use the package.
 //
@@ -23,6 +25,8 @@ type Handle struct {
 	blas *cublas.Handle
 
 	kernels32 *cuda.Module
+
+	streams []*cuda.Stream
 }
 
 // NewHandleDefault creates a handle with the default CUDA
