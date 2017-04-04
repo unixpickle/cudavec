@@ -52,8 +52,8 @@ func (v *vector32) Sum() anyvec.Numeric {
 
 func (v *vector32) ScaleChunks(other anyvec.Vector) {
 	v1 := other.(*vector32)
-	if v == v1 {
-		panic("inputs overlap")
+	if v.Overlaps(v1) {
+		panic("invalid overlap")
 	} else if v.Len()%v1.Len() != 0 {
 		panic("scaler count must divide vector size")
 	}
@@ -70,8 +70,8 @@ func (v *vector32) ScaleChunks(other anyvec.Vector) {
 
 func (v *vector32) AddChunks(other anyvec.Vector) {
 	v1 := other.(*vector32)
-	if v == v1 {
-		panic("inputs overlap")
+	if v.Overlaps(v1) {
+		panic("invalid overlap")
 	} else if v.Len()%v1.Len() != 0 {
 		panic("scaler count must divide vector size")
 	}
@@ -154,8 +154,8 @@ func (v *vector32) ScaleRepeated(other anyvec.Vector) {
 }
 
 func (v *vector32) repeatedOp(kernel string, v1 *vector32) {
-	if v == v1 {
-		panic("inputs overlap")
+	if v.Overlaps(v1) {
+		panic("invalid overlap")
 	} else if v1.Len() == 0 {
 		panic("repeated vector cannot be empty")
 	}
@@ -434,8 +434,8 @@ func (v *vector32) BatchedGemm(transA, transB bool, num, m, n, k int, alpha anyv
 	b32 := b.(*vector32)
 	alpha32 := alpha.(float32)
 	beta32 := beta.(float32)
-	if a32 == v || b32 == v {
-		panic("vectors cannot be equal")
+	if v.Overlaps(a32) || v.Overlaps(b32) {
+		panic("invalid overlap")
 	}
 	v.creator.run(func() error {
 		if err := lazyInitAll(true, a32, b32, v); err != nil {

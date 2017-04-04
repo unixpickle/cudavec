@@ -10,6 +10,10 @@ type vector32 struct {
 	creator *Creator32
 	size    int
 
+	// Used to detect overlap.
+	bufferID *int
+	start    int
+
 	// May be nil for lazy evaluations.
 	buffer cuda.Buffer
 }
@@ -20,6 +24,13 @@ func (v *vector32) Creator() anyvec.Creator {
 
 func (v *vector32) Len() int {
 	return v.size
+}
+
+func (v *vector32) Overlaps(v1 anyvec.Vector) bool {
+	v1Vec := v1.(*vector32)
+	return v1Vec.bufferID == v.bufferID &&
+		v.start < v1Vec.start+v1Vec.Len() &&
+		v1Vec.start < v.start+v.Len()
 }
 
 func (v *vector32) Data() anyvec.NumericList {
@@ -74,54 +85,20 @@ func (v *vector32) Slice(start, end int) anyvec.Vector {
 	if start < 0 || start > end || end > v.Len() {
 		panic("index out of range")
 	}
-	res := &vector32{creator: v.creator, size: end - start}
-	v.run(func() (err error) {
-		if v.buffer == nil {
-			return nil
-		}
-		subSlice := cuda.Slice(v.buffer, uintptr(start)*4, uintptr(end)*4)
-		res.buffer, err = cuda.AllocBuffer(v.creator.Handle.allocator,
-			uintptr(res.size)*4)
-		if err != nil {
-			return err
-		}
-		return cuda.CopyBuffer(res.buffer, subSlice)
-	})
-	return res
-}
-
-func (v *vector32) SetSlice(start int, other anyvec.Vector) {
-	v1 := other.(*vector32)
-	if start <= -v1.Len() || start >= v.Len() {
-		return
+	res := &vector32{
+		creator:  v.creator,
+		size:     end - start,
+		bufferID: v.bufferID,
+		start:    v.start + start,
 	}
-
-	v.run(func() error {
-		if v.buffer == nil && v1.buffer == nil {
-			return nil
-		}
-		dstStart := start
-		srcStart := 0
-		if start < 0 {
-			dstStart = 0
-			srcStart = -start
-		}
-		copyCount := v1.Len() - srcStart
-		if v.Len()-dstStart < copyCount {
-			copyCount = v.Len() - dstStart
-		}
+	v.run(func() (err error) {
 		if err := v.lazyInit(true); err != nil {
 			return err
 		}
-		dst := cuda.Slice(v.buffer, uintptr(dstStart)*4,
-			uintptr(dstStart+copyCount)*4)
-		if v1.buffer == nil {
-			return cuda.ClearBuffer(dst)
-		}
-		srcSlice := cuda.Slice(v1.buffer, uintptr(srcStart)*4,
-			uintptr(srcStart+copyCount)*4)
-		return cuda.CopyBuffer(dst, srcSlice)
+		res.buffer = cuda.Slice(v.buffer, uintptr(start)*4, uintptr(end)*4)
+		return nil
 	})
+	return res
 }
 
 func (v *vector32) Scale(s anyvec.Numeric) {
@@ -202,8 +179,8 @@ func (v *vector32) Gemm(transA, transB bool, m, n, k int,
 	betaFloat := beta.(float32)
 	a32 := a.(*vector32)
 	b32 := b.(*vector32)
-	if a32 == v || b32 == v {
-		panic("vectors cannot be equal")
+	if v.Overlaps(a32) || v.Overlaps(b32) {
+		panic("invalid overlap")
 	}
 	v.run(func() error {
 		if err := lazyInitAll(true, v, a32, b32); err != nil {
@@ -229,8 +206,8 @@ func (v *vector32) Gemv(trans bool, m, n int, alpha anyvec.Numeric, a anyvec.Vec
 	betaFloat := beta.(float32)
 	x32 := x.(*vector32)
 	a32 := a.(*vector32)
-	if x32 == v || a32 == v {
-		panic("vectors cannot be equal")
+	if v.Overlaps(x32) || v.Overlaps(a32) {
+		panic("invalid overlap")
 	}
 	v.run(func() error {
 		if err := lazyInitAll(true, v, x32, a32); err != nil {
@@ -292,8 +269,8 @@ func (v *vector32) lazyInit(clear bool) error {
 }
 
 func (v *vector32) assertCompat(v1 *vector32, readOnly bool) {
-	if !readOnly && v == v1 {
-		panic("vectors cannot be equal")
+	if !readOnly && v.Overlaps(v1) {
+		panic("invalid overlap")
 	} else if v.Len() != v1.Len() {
 		panic("length mismatch")
 	}

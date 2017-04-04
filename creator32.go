@@ -28,8 +28,9 @@ func (c *Creator32) MakeNumericList(x []float64) anyvec.NumericList {
 // MakeVector creates a zero'd out anyvec.Vector.
 func (c *Creator32) MakeVector(size int) anyvec.Vector {
 	return &vector32{
-		creator: c,
-		size:    size,
+		bufferID: new(int),
+		creator:  c,
+		size:     size,
 	}
 }
 
@@ -57,8 +58,9 @@ func (c *Creator32) Concat(v ...anyvec.Vector) anyvec.Vector {
 	}
 
 	res := &vector32{
-		creator: c,
-		size:    totalLen,
+		creator:  c,
+		size:     totalLen,
+		bufferID: new(int),
 	}
 
 	c.run(func() error {
