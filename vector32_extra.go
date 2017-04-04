@@ -383,7 +383,7 @@ func (v *vector32) MapMax(cols int) anyvec.Mapper {
 			return err
 		}
 		res.table = buf
-		dummyVec := &vector32{size: rows}
+		dummyVec := &vector32{size: rows, bufferID: new(int)}
 		grid, block := dummyVec.kernelSizes()
 		return v.creator.Handle.kernels32.Launch("mapMax", grid, 1, 1, block, 1, 1,
 			0, nil, buf, v.buffer, rows, cols)
@@ -401,7 +401,7 @@ func (v *vector32) SumRows(cols int) anyvec.Vector {
 		return v.Creator().MakeVector(cols)
 	}
 	rows := v.Len() / cols
-	res := &vector32{creator: v.creator, size: cols}
+	res := &vector32{creator: v.creator, size: cols, bufferID: new(int)}
 	v.run(func() error {
 		if err := lazyInitAll(true, v, res); err != nil {
 			return err
@@ -410,7 +410,7 @@ func (v *vector32) SumRows(cols int) anyvec.Vector {
 		if err != nil {
 			return err
 		}
-		dummy := vector32{size: rows}
+		dummy := vector32{size: rows, bufferID: new(int)}
 		grid, block := dummy.kernelSizes()
 		err = v.creator.Handle.kernels32.Launch("setScaler", grid, 1, 1,
 			block, 1, 1, 0, nil, float32(1), ones, rows)
