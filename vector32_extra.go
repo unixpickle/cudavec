@@ -401,7 +401,7 @@ func (v *vector32) SumRows(cols int) anyvec.Vector {
 		return v.Creator().MakeVector(cols)
 	}
 	rows := v.Len() / cols
-	res := &vector32{creator: v.creator, size: cols, bufferID: new(int)}
+	res := v.Creator().MakeVector(cols).(*vector32)
 	v.run(func() error {
 		if err := lazyInitAll(true, v, res); err != nil {
 			return err
