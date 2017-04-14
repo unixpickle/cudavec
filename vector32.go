@@ -111,7 +111,7 @@ func (v *vector32) Scale(s anyvec.Numeric) {
 	})
 }
 
-func (v *vector32) AddScaler(s anyvec.Numeric) {
+func (v *vector32) AddScalar(s anyvec.Numeric) {
 	scaler := s.(float32)
 	v.run(func() error {
 		if err := v.lazyInit(true); err != nil {

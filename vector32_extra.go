@@ -46,7 +46,7 @@ func (v *vector32) unaryOp(kernel string) {
 
 func (v *vector32) Sum() anyvec.Numeric {
 	ones := v.Creator().MakeVector(v.Len())
-	ones.AddScaler(float32(1))
+	ones.AddScalar(float32(1))
 	return v.Dot(ones)
 }
 
