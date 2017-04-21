@@ -2,6 +2,7 @@ package cudavec
 
 import (
 	"github.com/unixpickle/anyvec"
+	"github.com/unixpickle/anyvec/anyvec32"
 	"github.com/unixpickle/cuda"
 )
 
@@ -96,6 +97,11 @@ func (c *Creator32) MakeMapper(inSize int, table []int) anyvec.Mapper {
 		panic("input size out of range")
 	}
 	return newMapper32(c, inSize, table)
+}
+
+// NumOps returns a NumOps for float32 numerics.
+func (c *Creator32) NumOps() anyvec.NumOps {
+	return anyvec32.NumOps{}
 }
 
 func (c *Creator32) run(f func() error) <-chan error {
