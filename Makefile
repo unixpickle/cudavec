@@ -5,7 +5,7 @@ kernels32.go: kernels32.cu
 	echo 'package cudavec' >$@
 	echo '' >>$@
 	echo 'var kernels32PTX = `' >>$@
-	cat kernels32.ptx >>$@
+	cat kernels32.ptx | sed -E 's/.version 5\../.version 4.3/' >>$@
 	echo '`' >>$@
 	rm kernels32.ptx
 

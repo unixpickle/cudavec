@@ -9,7 +9,7 @@ var kernels32PTX = `
 // Based on LLVM 3.4svn
 //
 
-.version 5.0
+.version 4.3
 .target sm_30
 .address_size 64
 
