@@ -104,6 +104,16 @@ func (c *Creator32) NumOps() anyvec.NumOps {
 	return anyvec32.NumOps{}
 }
 
+// Float64 converts the float32 to a float64.
+func (c *Creator32) Float64(n anyvec.Numeric) float64 {
+	return anyvec32.DefaultCreator{}.Float64(n)
+}
+
+// Float64Slice converts the []float32 to a []float64.
+func (c *Creator32) Float64Slice(n anyvec.NumericList) []float64 {
+	return anyvec32.DefaultCreator{}.Float64Slice(n)
+}
+
 func (c *Creator32) run(f func() error) <-chan error {
 	return c.Handle.context.Run(func() error {
 		if err := f(); err != nil {
